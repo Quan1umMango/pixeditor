@@ -16,5 +16,5 @@ Enjoy
 
 
 ## Screenshots
-![screenshot 1](https://github.com/Quan1umMango/pixeditor/blob/main/screenshot0.jpg?raw=true)
-![screenshot 2](https://github.com/Quan1umMango/pixeditor/blob/main/screenshot1.jpg?raw=true)
+![screenshot 1](https://github.com/Quan1umMango/pixeditor/blob/main/screenshots/screenshot0.jpg?raw=true)
+![screenshot 2](https://github.com/Quan1umMango/pixeditor/blob/main/screenshots/screenshot1.jpg?raw=true)
