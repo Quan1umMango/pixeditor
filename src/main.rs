@@ -4,11 +4,13 @@ mod ui;
 mod canvas;
 mod canvas_misc;
 mod project;
+mod undo_redo;
 
 use ui::*;
 use project::*;
 use canvas::*;
 use canvas_misc::*;
+use undo_redo::*;
 
 pub const MAX_ZOOM_POSITIVE:f32 = 3.0;
 pub const MAX_ZOOM_NEGATIVE:f32 = 0.1;

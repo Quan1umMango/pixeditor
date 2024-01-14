@@ -92,7 +92,7 @@ impl Project {
             if is_mouse_button_pressed(MouseButton::Left) || is_mouse_button_down(MouseButton::Left){
                 if self.canvas.init_pos_draw().is_none() {
                     self.canvas.set_init_pos_draw(Some(point));
-                }
+                }else {}
                 self.canvas.draw_to_image_repr(point,&self.state);
             }else {
                 self.canvas.finish_drawing_current(&self.state); 
@@ -103,16 +103,12 @@ impl Project {
 
     pub fn backend(&mut self) {
         self.handle_zoom();
-
+        
         self.move_camera();       
         self.handle_drawing();
 
-        // Saving images
-        if is_key_pressed(KeyCode::Space) {
-            self.canvas.save_image();
-        }
+        self.handle_keyboard_shortcuts();
     }
-
 
 
     pub fn frontend(&mut self) {
@@ -133,9 +129,75 @@ impl Project {
             }
 
         }
+        self.ui.draw(&mut self.name,&mut self.state,&mut self.canvas)
+    }
 
-        self.ui.draw(&mut self.name,&mut self.state,&mut self.canvas);
 
+
+    pub fn handle_keyboard_shortcuts(&mut self) {
+        if !(is_key_down(KeyCode::RightControl) || is_key_down(KeyCode::LeftControl)) {
+            return;
+        }
+
+        if is_key_pressed(KeyCode::S) {
+            self.handle_saving();
+        }else if is_key_pressed(KeyCode::Z) {
+            self.canvas.undo();
+        }else if is_key_pressed(KeyCode::Y) {
+            self.canvas.redo();
+        }else if is_key_down(KeyCode::Z) {
+            self.canvas.undo();
+        } else if is_key_down(KeyCode::Y) {
+            self.canvas.redo();
+        }
+
+    }
+
+    // Does all the saving stuff
+    // checks if there is already a name, asks user a name etc.
+    pub fn handle_saving(&mut self) {
+        if let Some(name)  = &self.name {
+            self.canvas.save_image_with_name(name.as_str()); 
+        }else  {
+            self.save_as();
+        }
+    }
+
+    pub fn save_as(&mut self) {
+
+        use native_dialog::*;
+     let path = FileDialog::new()
+                .set_location("~/Desktop")
+                .add_filter("PNG Image", &["png"])
+                .add_filter("JPEG Image", &["jpg", "jpeg"])
+                .show_save_single_file()
+                .unwrap();
+
+            if let Some(n) = path {
+                let n = n.as_os_str().to_str().unwrap();
+                self.name = Some(n.to_string());
+                self.canvas.save_image_with_name(n);
+            }
+    }
+
+    pub fn set_draw_state(&mut self,new_state:DrawState) {
+        self.state = new_state
+    }
+
+    pub fn draw_state(&self) -> &DrawState {
+        &self.state
+    }
+
+    pub fn canvas(&self) ->&Canvas {
+        &self.canvas
+    }
+
+    pub fn canvas_mut(&mut self) -> &mut Canvas {
+        &mut self.canvas
+    }
+
+    pub fn ui_mut(&mut self) -> &mut Ui {
+        &mut self.ui
     }
 }
 

@@ -1,9 +1,10 @@
 use crate::*;
 
-
+#[derive(Clone)]
 pub struct CanvasSavedSettings {
     tool_settings: Vec<DrawState>
 }
+
 
 impl CanvasSavedSettings {
     fn new() -> Self {
@@ -39,6 +40,7 @@ impl CanvasSavedSettings {
     }
 }
 
+#[derive(Clone)]
 pub struct Canvas {
     image:Image,
     image_repr:ImageRepr,
@@ -47,6 +49,7 @@ pub struct Canvas {
     texture:Texture2D,
     init_pos_draw:Option<Vec2>,
     saved_settings:CanvasSavedSettings,
+    undo_redo_manager:UndoRedoManager<ImageRepr>,
 }
 
 impl Canvas {
@@ -57,26 +60,30 @@ impl Canvas {
 
     pub fn new_with_w_h(w:u16,h:u16) -> Self {
         let img = Image::gen_image_color(w,h,Color::from_rgba(0,0,0,0));
+        let img_repr = ImageRepr::from_image(&img);
         Self {
             texture:Texture2D::from_image(&img),
-            image_repr:ImageRepr::from_image(&img),
-            image_repr_copy:ImageRepr::from_image(&img),
+            image_repr:img_repr.clone(),
+            image_repr_copy:img_repr.clone(),
             image:img,
             image_repr_copy_buffer:None,
             init_pos_draw:None,
             saved_settings:CanvasSavedSettings::new(),
+           undo_redo_manager:UndoRedoManager::new(), 
         }
     } 
 
     pub fn new_with_image(img:Image) -> Self {
+        let img_repr = ImageRepr::from_image(&img);
         return Self {
             texture:Texture2D::from_image(&img),
-            image_repr:ImageRepr::from_image(&img),
-            image_repr_copy:ImageRepr::from_image(&img),
+            image_repr:img_repr.clone(),
+            image_repr_copy:img_repr.clone(),
             image:img,
             image_repr_copy_buffer:None,
             init_pos_draw:None,
             saved_settings:CanvasSavedSettings::new(),
+           undo_redo_manager:UndoRedoManager::new(), 
         }
     }
 
@@ -131,65 +138,54 @@ impl Canvas {
         let dimensions = (self.image.width() as u32,self.image.height() as u32);
         match state {
             Erase => {
+                self.undo_redo_manager.push(self.image_repr.clone());
                 self.image_repr.set_pixel(px,py,self.image_repr_copy.get_pixel(px,py));
+
             }
             SinglePixel {color}=> {
+                self.undo_redo_manager.push(self.image_repr.clone());
                 self.image_repr.set_pixel(px, py,*color);
             }
+
             RectangleBorder { thickness, color } => {
                 if let Some(init_pos) = self.init_pos_draw {
                     if self.image_repr_copy_buffer.is_none() {
                         self.image_repr_copy_buffer = Some(self.image_repr.clone());
+                        self.undo_redo_manager.push(self.image_repr.clone());
                     }
-
-                    self.image_repr = self.image_repr_copy_buffer.clone().unwrap(); 
+                    let mut buffer = self.image_repr_copy_buffer.clone().unwrap();
 
                     // get initial pixel positions
-                    let (mut ipx, mut ipy) = get_pixel_coords(init_pos,dimensions);
-                    if ipx == px || ipy == py {
-                        return;
+                    let pixels = rect_get_border_pixels(&init_pos, dimensions, px, py, &self.image);
+                    for (x, y) in pixels.iter() {
+                        buffer.set_pixel(*x, *y, *color);
                     }
 
-                    if ipx >= self.image.width() as u32 {
-                        ipx = self.image.width() as u32 - 1;
-                    }
-                    if ipy >= self.image.height() as u32{
-                        ipy = self.image.height() as u32 - 1;
-                    }
-
-                    for x in px.min(ipx)+1..=px.max(ipx) {                        
-                        if x >= self.image.width() as u32 {
-                            return;
-                        }
-                        self.image_repr.set_pixel(x, ipy, *color);
-                        self.image_repr.set_pixel(x, py, *color);
-
-                    }
-
-                    for y in py.min(ipy)..=py.max(ipy) {
-                        if y >= self.image.height() as u32{
-                            return;
-                        }
-                        self.image_repr.set_pixel(ipx, y, *color);
-                        self.image_repr.set_pixel(px, y, *color);
-
-                    }
+                    self.image_repr = buffer;
                 } else {
                     self.image_repr_copy_buffer = None;
                     self.init_pos_draw = None;
                     return;
                 }
             }
-            RectangleFill{color} => {
+
+            RectangleFill { color } => {
+                if let Some(i) = &self.image_repr_copy_buffer {
+                    self.undo_redo_manager.push(self.image_repr.clone());
+                }
                 if let Some(init_pos) = self.init_pos_draw {
                     if self.image_repr_copy_buffer.is_none() {
                         self.image_repr_copy_buffer = Some(self.image_repr.clone());
                     }
-                    self.image_repr = self.image_repr_copy_buffer.clone().unwrap(); 
+                    let mut buffer = self.image_repr_copy_buffer.clone().unwrap();
 
+                    let pixels = rect_get_border_pixels(&init_pos, dimensions, px, py, &self.image);
+                    for (x, y) in pixels.iter() {
+                        buffer.set_pixel(*x, *y, *color);
+                    }
 
-                    // get initial pixel positions
-                    let (mut ipx, mut ipy) = get_pixel_coords(init_pos,dimensions);
+                    // Filling part
+                    let (mut ipx, mut ipy) = get_pixel_coords(init_pos, dimensions);
                     if ipx == px || ipy == py {
                         return;
                     }
@@ -201,31 +197,13 @@ impl Canvas {
                         ipy = self.image.height() as u32 - 1;
                     }
 
-                    for x in px.min(ipx)+1..=px.max(ipx) {                        
-                        if x >= self.image.width() as u32 {
-                            return;
-                        }
-                        self.image_repr.set_pixel(x, ipy, *color);
-                        self.image_repr.set_pixel(x, py, *color);
-
-                    }
-
-                    for y in py.min(ipy)..=py.max(ipy) {
-                        if y >= self.image.height() as u32{
-                            return;
-                        }
-                        self.image_repr.set_pixel(ipx, y, *color);
-                        self.image_repr.set_pixel(px, y, *color);
-
-                    }
-
-                    // Filling part 
                     for x in ipx.min(px)..ipx.max(px) {
                         for y in ipy.min(py)..ipy.max(py) {
-                            self.image_repr.set_pixel(x,y,*color);
+                            buffer.set_pixel(x, y, *color);
                         }
                     }
 
+                    self.image_repr = buffer;
                 } else {
                     self.image_repr_copy_buffer = None;
                     self.init_pos_draw = None;
@@ -233,8 +211,10 @@ impl Canvas {
                 }
             }
 
+
             Fill {color} => {
                 let (_rect,wanted_color) = self.image_repr().get_pixel_data(px,py);
+                self.undo_redo_manager.push(self.image_repr.clone());
                 let mut neighbours:Vec<usize> = Vec::new();
                 if let Some(pixel_index) = self.image_repr().get_pixel_index(px,py) {
                     fill_get_all_pixels(pixel_index,self.image_repr(),&mut neighbours,wanted_color);
@@ -242,7 +222,7 @@ impl Canvas {
                         self.image_repr.data[*i].1 = *color
                     }
                 }
-            
+
             }
             _ => unimplemented!(),
         }
@@ -287,6 +267,20 @@ impl Canvas {
     pub fn saved_settings_mut(&mut self) -> &mut CanvasSavedSettings {
         &mut self.saved_settings
     }
+
+    pub fn undo(&mut self) {
+        if let Some(r) = self.undo_redo_manager.undo() {
+            self.image_repr = r.clone();
+        }
+        
+    }
+
+    pub fn redo(&mut self) {
+         if let Some(r) = self.undo_redo_manager.redo() {
+            self.image_repr = r.clone();
+        } 
+    }
+
 
 }
 
@@ -333,7 +327,7 @@ pub fn get_pixel_coords(coords:Vec2,dimensions:(u32,u32)) -> (u32,u32) {
 
 
 // Representation of image pixels in rect form.
-#[derive(Clone)]
+#[derive(Clone,PartialEq)]
 pub struct ImageRepr {
     data:Vec<(Rect,Color)>,
     height:u32,
@@ -426,14 +420,14 @@ impl ImageRepr {
         Some(i as usize)
     }
 
-        
+
 
     pub fn get_neighbours(&self,i:usize) -> Vec<usize> {
         if i >= self.data.len() {
             return Vec::new();
         }
         let mut v = Vec::new();
-    
+
         // top row
 
         if (i as u32) < self.width() {
@@ -443,7 +437,7 @@ impl ImageRepr {
         else if (i as u32) > (self.width()*self.height()-2)-self.width() {
             v.push(i-self.width() as usize);
         }else {
-            
+
             v.push(i+self.width() as usize);
             v.push(i-self.width() as usize);
         }
@@ -457,7 +451,7 @@ impl ImageRepr {
             v.push(i+1);
             v.push(i-1);
         }
-        
+
         v
     }
 
@@ -485,7 +479,7 @@ impl ImageRepr {
     pub fn width(&self) -> u32 {
         self.width
     }
-    
+
     pub fn data(&self) -> &Vec<(Rect,Color)> {
         &self.data
     }
