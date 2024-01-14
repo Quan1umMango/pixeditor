@@ -1,5 +1,5 @@
 # PixEditor
-PixEditor is a basic pixel art making tool. It is currently very bare-bones but has **some basic features*.
+PixEditor is a basic pixel art making tool. It is currently very bare-bones but has *some basic features*.
 
 ## Tools currently available
 - Single Pixel: Paint a single pixel
