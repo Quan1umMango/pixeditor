@@ -15,3 +15,4 @@ image = "0.24.7"
 macroquad = {version="0.3.25"} # Cannot use latest because egui-macroquad isnt updated :( 
 native-dialog = "0.7.0"
 rusttype = "0.9.3"
+uuid = { version = "1.6.1", features = ["v4"] }

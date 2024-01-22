@@ -1,4 +1,5 @@
 use crate::*;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct CanvasSavedSettings {
@@ -50,12 +51,19 @@ pub struct Canvas {
     init_pos_draw:Option<Vec2>,
     saved_settings:CanvasSavedSettings,
     undo_redo_manager:UndoRedoManager<ImageRepr>,
+    id:Uuid
 }
 
 impl Canvas {
 
     pub fn new_empty() -> Self {
         return Self::new_with_w_h(32,32);
+    }
+
+    pub fn empty_from(refcanvas:&Canvas) -> Self {
+        let w = refcanvas.image.width() as u16;
+        let h = refcanvas.image.height() as u16;
+        return Self::new_with_w_h(w,h);
     }
 
     pub fn new_with_w_h(w:u16,h:u16) -> Self {
@@ -69,7 +77,8 @@ impl Canvas {
             image_repr_copy_buffer:None,
             init_pos_draw:None,
             saved_settings:CanvasSavedSettings::new(),
-           undo_redo_manager:UndoRedoManager::new(), 
+           undo_redo_manager:UndoRedoManager::new(),
+            id:Uuid::new_v4()
         }
     } 
 
@@ -84,13 +93,11 @@ impl Canvas {
             init_pos_draw:None,
             saved_settings:CanvasSavedSettings::new(),
            undo_redo_manager:UndoRedoManager::new(), 
+            id:Uuid::new_v4()
         }
     }
 
     pub fn draw_canvas(&self) {
-        let dimensions = (self.image.width() as u32,self.image.height() as u32);
-        draw_pixel_bg(dimensions);     
-
         self.image_repr.draw();
     }
 
@@ -213,14 +220,16 @@ impl Canvas {
 
 
             Fill {color} => {
-                let (_rect,wanted_color) = self.image_repr().get_pixel_data(px,py);
-                self.undo_redo_manager.push(self.image_repr.clone());
-                let mut neighbours:Vec<usize> = Vec::new();
-                if let Some(pixel_index) = self.image_repr().get_pixel_index(px,py) {
-                    fill_get_all_pixels(pixel_index,self.image_repr(),&mut neighbours,wanted_color);
-                    for i in neighbours.iter() {
-                        self.image_repr.data[*i].1 = *color
+                if let Some((_rect,wanted_color)) = self.image_repr().get_pixel_data(px,py) {
+                    self.undo_redo_manager.push(self.image_repr.clone());
+                    let mut neighbours:Vec<usize> = Vec::new();
+                    if let Some(pixel_index) = self.image_repr().get_pixel_index(px,py) {
+                        fill_get_all_pixels(pixel_index,self.image_repr(),&mut neighbours,wanted_color);
+                        for i in neighbours.iter() {
+                            self.image_repr.data[*i].1 = *color
+                        }
                     }
+
                 }
 
             }
@@ -229,7 +238,7 @@ impl Canvas {
 
 
     }
-
+    
     pub fn draw_to_image(&mut self) {
         let new_img = self.image_repr.to_image();
         self.image = new_img;
@@ -260,6 +269,15 @@ impl Canvas {
         &self.image_repr
     }
 
+    pub fn image_repr_mut(&mut self) -> &mut ImageRepr {
+        &mut self.image_repr
+    }
+
+
+    pub fn image(&self) -> &Image {
+        &self.image
+    }
+
     pub fn saved_settings(&self) -> &CanvasSavedSettings {
         &self.saved_settings
     }
@@ -281,41 +299,16 @@ impl Canvas {
         } 
     }
 
+    pub fn get_id(&self) -> &Uuid {
+        &self.id
+    }
 
 }
 
 
-
-fn draw_pixel_bg(dimensions:(u32,u32)) {
-    let (width, height) = dimensions;
-    let step_x = 1.0 / width as f32;
-    let step_y = 1.0 / height as f32;
-
-    let mut x = -0.5;
-    let mut y = -0.5;
-    let mut xs:Vec<f32> = Vec::new();
-    let mut ys:Vec<f32> = Vec::new();
-    for _ in 0..height {
-        ys.push(y);
-        y += step_y;
-    }
-
-    for _ in 0..width {
-        xs.push(x);
-        x += step_x;
-    }
-
-    for (ix,x) in xs.iter().enumerate() {
-        for (iy,y) in  ys.iter().enumerate() {
-            let color = if (ix+iy) %2==0 {
-                DARKGRAY
-            }else {
-                WHITE
-            };
-            draw_rectangle(*x,*y,step_x,step_y,color);
-        }
-    }
-}
+// UNREALIABLE: this sometimes gives more than the allowed height is the coords are more to the
+// invalid pixel
+// Will make a better one sometime in the future
 
 pub fn get_pixel_coords(coords:Vec2,dimensions:(u32,u32)) -> (u32,u32) {
     let (width, height) = dimensions;
@@ -381,9 +374,12 @@ impl ImageRepr {
     pub fn to_image(&self) -> Image {
         let mut image = Image::gen_image_color(self.width() as u16,self.height() as u16,Color::from_rgba(0,0,0,0));
         for i in 0..self.data.len() {
+            
             let x = i as u32%self.width() as u32;
             let y = i as u32/ self.width() as u32;
-            image.set_pixel(x,y,self.data[i].1);
+            let c = self.get_pixel(x,y);
+
+            image.set_pixel(x,y,c);
         } 
         return image;
     }
@@ -396,6 +392,23 @@ impl ImageRepr {
     }
 
 
+    pub fn draw_to_image(&self, image: &mut Image) {
+        let mut repr = self.clone(); 
+        repr.invert_x();
+        repr.invert_y();
+
+        for i in 0..repr.data().len() {
+            let x = i as u32 % repr.width() as u32;
+            let y = i as u32 / repr.width() as u32;
+            
+              let c = repr.get_pixel(x, y);
+            if c.a == 0.0 {
+                continue;
+            }
+            image.set_pixel(x, y, c);
+        }
+    }
+
     pub fn set_pixel(&mut self, x: u32, y: u32, color: Color) {
         let i = ((self.width()-1)-y) * self.width() + x;
         self.data[i as usize].1 = color;
@@ -406,13 +419,21 @@ impl ImageRepr {
         self.data[i as usize].1
     }
 
-    pub fn get_pixel_data(&self,x:u32,y:u32) -> (Rect,Color) {
-        let i = ((self.width()-1)-y) * self.width() + x;
-        self.data[i as usize]
+    
+    pub fn get_pixel_data(&self,x:u32,y:u32) -> Option<(Rect,Color)> {
+        if x >= self.width() || y >= self.height() {
+            return None
+        }
+       let i = (self.width()-1-y) * self.width() + x;
+        
+        self.data.get(i as usize).copied()
     }
 
-    pub fn get_pixel_rect(&self,x:u32,y:u32) -> Rect {
-        self.get_pixel_data(x,y).0
+    pub fn get_pixel_rect(&self,x:u32,y:u32) -> Option<Rect> {
+        if let Some(d) = self.get_pixel_data(x,y) {
+            return Some(d.0.clone())
+        }
+        None    
     }
 
     pub fn get_pixel_index(&self,x:u32,y:u32) -> Option<usize> {
@@ -460,17 +481,17 @@ impl ImageRepr {
     }
 
 
-    pub fn invert_x(&mut self) {
-        for y in 0..self.height() {
-            for x in 0..(self.width() - 1) / 2 {
-                let cur_index = (y * self.width() + x) as usize;
-                let mirror_index = (y * self.width() +self.width()- x - 1) as usize;
-                let temp = self.data[cur_index].1;
-                self.data[cur_index].1 = self.data[mirror_index].1;
-                self.data[mirror_index].1 = temp;
-            }
+  
+pub fn invert_x(&mut self) {
+    for y in 0..self.height() {
+        for x in 0..self.width() / 2 {
+            let cur_index = (y * self.width() + x) as usize;
+            let mirror_index = (y * self.width() + self.width() - x - 1) as usize;
+
+            self.data.swap(cur_index, mirror_index);
         }
     }
+}
 
     pub fn height(&self) -> u32 {
         self.height
@@ -483,4 +504,5 @@ impl ImageRepr {
     pub fn data(&self) -> &Vec<(Rect,Color)> {
         &self.data
     }
+
 }

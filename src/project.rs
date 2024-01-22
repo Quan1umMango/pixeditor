@@ -1,16 +1,14 @@
 use crate::*;
 
-
-
 pub struct Project {
     name:Option<String>,
-    canvas:Canvas,
     dimensions:(u8,u8),
     zoom:Vec2,
     init_pos:Option<(f32,f32)>,
     state:DrawState,
     camera:Camera2D,
     ui:Ui,
+    layers:Layers,
 }
 
 impl Project {
@@ -22,13 +20,13 @@ impl Project {
         set_camera(&camera);
         Self {
             name:None,
-            canvas:Canvas::new_with_w_h(dimensions.0 as u16,dimensions.1 as u16),
             dimensions,
             zoom:Vec2::new(0.,0.),
             init_pos:None,
             state:DrawState::default(),
             camera,
             ui:Ui::new(),
+            layers:Layers::new(Canvas::new_with_w_h(dimensions.0 as u16, dimensions.1 as u16)), 
         }
 
     }
@@ -88,53 +86,91 @@ impl Project {
 
             let (mx,my) = mouse_position();
             let point = self.camera.screen_to_world(vec2(mx,my));
+            let state = self.state;
 
-            if is_mouse_button_pressed(MouseButton::Left) || is_mouse_button_down(MouseButton::Left){
-                if self.canvas.init_pos_draw().is_none() {
-                    self.canvas.set_init_pos_draw(Some(point));
-                }else {}
-                self.canvas.draw_to_image_repr(point,&self.state);
-            }else {
-                self.canvas.finish_drawing_current(&self.state); 
-                self.canvas.set_init_pos_draw(None)
-            }   
+                let i= self.layers.get_current_layer_index().clone();
+            if let Some(canvas) = self.layers.get_current_layer_mut() {
+                if is_mouse_button_pressed(MouseButton::Left) || is_mouse_button_down(MouseButton::Left){
+                    if canvas.init_pos_draw().is_none() {
+                        canvas.set_init_pos_draw(Some(point));
+                    }else {
+                        canvas.draw_to_image_repr(point,&state);
+                    }
+                }else {
+                    canvas.finish_drawing_current(&state); 
+                    canvas.set_init_pos_draw(None)
+                }   
+            }
+
         }
     }
 
     pub fn backend(&mut self) {
         self.handle_zoom();
         
-        self.move_camera();       
-        self.handle_drawing();
+        self.move_camera(); 
+              self.handle_drawing();
 
         self.handle_keyboard_shortcuts();
     }
 
 
+
     pub fn frontend(&mut self) {
-        self.canvas.draw_canvas();
-
-        // draw a gray square in the camera position to the nearest pixel
-        // This gives a nice effect 
-        if !self.canvas.init_pos_draw().is_some()  {
-
-            let (mx,my) = mouse_position();
-            let mcoords  = self.camera.screen_to_world(vec2(mx,my));
-            let dimensions = (self.dimensions.0 as u32, self.dimensions.1 as u32);
-            if !(mcoords.x >= 0.5 || mcoords.x <= -0.5 || mcoords.y >= 0.5 || mcoords.y <= -0.5){
-                let (px,py) = get_pixel_coords(mcoords,dimensions);
-                let r = self.canvas.image_repr().get_pixel_rect(px,py);
-                let color = Color::new(0.51, 0.51, 0.51, 0.5); //translucent ray-ish 
-                draw_rectangle(r.x ,r.y,r.w,r.h,color);           
-            }
-
+        if self.get_selected_canvas_mut().is_none() {
+            return;
         }
-        self.ui.draw(&mut self.name,&mut self.state,&mut self.canvas)
+
+        let (mx, my) = mouse_position();
+        let mcoords = self.camera.screen_to_world(vec2(mx, my));
+        let dimensions = (self.dimensions.0 as u32, self.dimensions.1 as u32);
+        
+        draw_pixel_bg(dimensions);
+        let active_layers = self.layers.get_all_active().clone();
+        for id in active_layers.iter() {
+            if let Some(e) = self.layers.get_active_layer(id) {
+                e.draw_canvas();
+            }
+        }
+
+        {let canvas = self.get_selected_canvas_mut().unwrap();
+            
+
+            // draw a gray square in the camera position to the nearest pixel
+            // This gives a nice effect
+            if !canvas.init_pos_draw().is_some() {
+                if !(mcoords.x >= 0.5 || mcoords.x <= -0.5 || mcoords.y >= 0.5 || mcoords.y <= -0.5) {
+                    let (px, py) = get_pixel_coords(mcoords, dimensions);
+                    if let Some(r) = canvas.image_repr().get_pixel_rect(px,py) {
+                        let color = Color::new(0.51, 0.51, 0.51, 0.5); // translucent gray-ish
+                        draw_rectangle(r.x, r.y, r.w, r.h, color);
+
+                    }
+                }
+            }
+        }
+        {
+
+
+            let mut lc = self.layers.clone();
+            let mut ui_name = self.name.clone();
+            let mut ui_state = self.state.clone();
+            let mut ui = self.ui_mut();
+            ui.draw(&mut ui_name,&mut ui_state,&mut lc);
+            self.name = ui_name;
+            self.state = ui_state;
+            self.layers = lc;
+           // *self.layers.get_current_layer_mut().unwrap() = canvas;
+        }
+
+
     }
 
 
 
+
     pub fn handle_keyboard_shortcuts(&mut self) {
+        if let Some(mut canvas) = self.get_selected_canvas_mut() {
         if !(is_key_down(KeyCode::RightControl) || is_key_down(KeyCode::LeftControl)) {
             return;
         }
@@ -142,31 +178,39 @@ impl Project {
         if is_key_pressed(KeyCode::S) {
             self.handle_saving();
         }else if is_key_pressed(KeyCode::Z) {
-            self.canvas.undo();
+            canvas.undo();
         }else if is_key_pressed(KeyCode::Y) {
-            self.canvas.redo();
+            canvas.redo();
         }else if is_key_down(KeyCode::Z) {
-            self.canvas.undo();
+            canvas.undo();
         } else if is_key_down(KeyCode::Y) {
-            self.canvas.redo();
+            canvas.redo();
         }
+        }
+
 
     }
 
     // Does all the saving stuff
     // checks if there is already a name, asks user a name etc.
     pub fn handle_saving(&mut self) {
-        if let Some(name)  = &self.name {
-            self.canvas.save_image_with_name(name.as_str()); 
-        }else  {
-            self.save_as();
+        if self.get_selected_canvas_mut().is_none() {
+            return;
         }
+            if let Some(name)  = self.name.clone() {
+               self.get_selected_canvas_mut().unwrap().save_image_with_name(name.as_str()); 
+            }else  {
+                self.save_as();
+            }
+
     }
 
     pub fn save_as(&mut self) {
-
-        use native_dialog::*;
-     let path = FileDialog::new()
+        if self.get_selected_canvas_mut().is_none() {
+            return;
+        }
+            use native_dialog::*;
+            let path = FileDialog::new()
                 .set_location("~/Desktop")
                 .add_filter("PNG Image", &["png"])
                 .add_filter("JPEG Image", &["jpg", "jpeg"])
@@ -175,11 +219,13 @@ impl Project {
 
             if let Some(n) = path {
                 let n = n.as_os_str().to_str().unwrap();
-                self.name = Some(n.to_string());
-                self.canvas.save_image_with_name(n);
+                self.set_name(n.to_string());
+                self.get_selected_canvas_mut().unwrap().save_image_with_name(n);
             }
+
     }
 
+   
     pub fn set_draw_state(&mut self,new_state:DrawState) {
         self.state = new_state
     }
@@ -188,17 +234,70 @@ impl Project {
         &self.state
     }
 
-    pub fn canvas(&self) ->&Canvas {
-        &self.canvas
-    }
-
-    pub fn canvas_mut(&mut self) -> &mut Canvas {
-        &mut self.canvas
-    }
+    pub fn set_name(&mut self,name:String) {
+        self.name = Some(name);
+    } 
 
     pub fn ui_mut(&mut self) -> &mut Ui {
         &mut self.ui
     }
+
+    pub fn get_selected_canvas(&mut self) -> Option<&Canvas> {
+        self.layers.get_current_layer() 
+
+    }
+
+    pub fn get_selected_canvas_mut(&mut self) -> Option<&mut Canvas> {
+        self.layers.get_current_layer_mut()
+    }
+
+    pub fn ui(&self) -> &Ui {
+        &self.ui
+    }
+    
+    pub fn state_mut(&mut self) -> &mut DrawState {
+        &mut self.state
+    }
+
+    pub fn name_mut(&mut self) -> &mut Option<String> {
+        &mut self.name
+    }
+
 }
+
+
+fn draw_pixel_bg(dimensions:(u32,u32)) {
+    let (width, height) = dimensions;
+    let step_x = 1.0 / width as f32;
+    let step_y = 1.0 / height as f32;
+
+    let mut x = -0.5;
+    let mut y = -0.5;
+    let mut xs:Vec<f32> = Vec::new();
+    let mut ys:Vec<f32> = Vec::new();
+    for _ in 0..height {
+        ys.push(y);
+        y += step_y;
+    }
+
+    for _ in 0..width {
+        xs.push(x);
+        x += step_x;
+    }
+
+    for (ix,x) in xs.iter().enumerate() {
+        for (iy,y) in  ys.iter().enumerate() {
+            let color = if (ix+iy) %2==0 {
+                DARKGRAY
+            }else {
+                WHITE
+            };
+            draw_rectangle(*x,*y,step_x,step_y,color);
+        }
+    }
+
+    
+}
+
 
 
