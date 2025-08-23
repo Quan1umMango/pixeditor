@@ -1,0 +1,20 @@
+# PixEditor
+> [!WARNING]
+> This software is still in development.
+
+A lightweight pixel art making tool.
+
+
+# Tools 
+- Single Pixel Editor
+- Eraser
+- Rectangle (filled and unfilled)
+- Flood Fill 
+
+# TODO
+- [ ] Add saving functionality.
+- [ ] Fix draw line tool.
+- [ ] Better UI.
+- [ ] Add layers.
+- [ ] Add loading from saved files.
+
