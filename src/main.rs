@@ -117,7 +117,7 @@ impl App {
                                         st.file_name.clone(),
                                         v,
                                     )));
-                                } 
+                                }
                             }
                         });
                 });

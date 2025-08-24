@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::RECT_DIMS;
 use crate::{FillType, Layer, Tool, ToolInfo, ToolKind};
 use macroquad::prelude::*;
@@ -12,7 +9,7 @@ pub struct Canvas {
     num_pixels: usize,
     active_layer: usize,
     layers: Vec<Layer>,
-    tool: Rc<RefCell<Tool>>,
+    tool: Tool,
     selected_color: Color,
 }
 
@@ -168,9 +165,9 @@ impl Canvas {
         let c1 = WHITE;
         let c2 = BLACK;
 
-        let tool = Rc::<RefCell<Tool>>::clone(&self.tool);
-        let kind = tool.borrow().kind;
-        let info = &tool.borrow().info;
+        let tool = &self.tool;
+        let kind = tool.kind;
+        let info = &tool.info;
         let start_end_pos: Option<(Vec2, Vec2)> = self.get_pos_from_tool_info(camera, info);
         //let pixels_to_draw_special:Option<Vec<usize>> = self.get_pixels_to_draw_special();
 
@@ -297,7 +294,7 @@ impl Canvas {
     }
 
     pub fn set_tool(&mut self, new_tool: Tool) {
-        *self.tool.borrow_mut() = new_tool;
+        self.tool = new_tool;
     }
 
     pub fn get_pixel_index_at_mouse_position(&self, camera: &Camera2D) -> Option<usize> {
@@ -309,113 +306,115 @@ impl Canvas {
         let np = self.num_pixels;
         let sc = Some(self.selected_color);
 
-        let tool = Rc::<RefCell<Tool>>::clone(&self.tool);
-        let mut t = tool.borrow_mut();
-        match t.kind {
-            ToolKind::Pixel => {
-                if !is_mouse_button_down(MouseButton::Left) {
-                    return;
-                }
-                self.set_pixel_at_mouse_position_selected_color(camera);
-            }
-            ToolKind::Eraser => {
-                if !is_mouse_button_down(MouseButton::Left) {
-                    return;
-                }
-                self.erase_at_mouse_position(camera);
-            }
-            ToolKind::Rect(fill_type) => {
-                if t.info.initial_loc.is_none() {
+        // Restoring is done after the blk block
+        let mut tool = std::mem::take(&mut self.tool);
+
+        'blk: {
+            match tool.kind {
+                ToolKind::Pixel => {
                     if !is_mouse_button_down(MouseButton::Left) {
-                        return;
+                        break 'blk;
                     }
-                    t.info.initial_loc = Some(mouse_position().into());
+                    self.set_pixel_at_mouse_position(sc, camera);
+                }
+                ToolKind::Eraser => {
+                    if !is_mouse_button_down(MouseButton::Left) {
+                        break 'blk;
+                    }
+
+                    self.erase_at_mouse_position(camera);
                 }
 
-                t.info.final_loc = Some(mouse_position().into());
+                ToolKind::Rect(fill_type) => {
+                    if tool.info.initial_loc.is_none() {
+                        if !is_mouse_button_down(MouseButton::Left) {
+                            break 'blk;
+                        }
+                        tool.info.initial_loc = Some(mouse_position().into());
+                    }
 
-                if is_mouse_button_down(MouseButton::Left) {
-                    return;
-                }
+                    tool.info.final_loc = Some(mouse_position().into());
 
-                let rects = self.get_pos_from_tool_info(camera, &t.info);
-                t.info = ToolInfo::default();
-                if rects.is_none() {
-                    return;
-                }
+                    if is_mouse_button_down(MouseButton::Left) {
+                        break 'blk;
+                    }
 
-                let (min, max) = rects.unwrap();
-                let active_layer = self.active_layer_mut().unwrap();
+                    let rects = self.get_pos_from_tool_info(camera, &tool.info);
 
-                // Draw top and bottom:
-                for i in 0..(np.pow(2)) {
-                    let x = (i % np) as f32;
-                    let y = (i / np) as f32;
+                    tool.info = ToolInfo::default();
 
-                    let cpos = vec2(x * RECT_DIMS.x - 1.0, y * RECT_DIMS.y - 1.0);
-                    match fill_type {
-                        FillType::NoFill => {
-                            if !((cpos.x >= min.x && cpos.x <= max.x)
-                                && (cpos.y == min.y || cpos.y == max.y))
-                                && !((cpos.y >= min.y && cpos.y <= max.y)
-                                    && (cpos.x == min.x || cpos.x == max.x))
-                            {
-                                continue;
+                    if rects.is_none() {
+                        break 'blk;
+                    }
+                    let (min, max) = rects.unwrap();
+
+                    for i in 0..(np.pow(2)) {
+                        let x = (i % np) as f32;
+                        let y = (i / np) as f32;
+
+                        let cpos = vec2(x * RECT_DIMS.x - 1.0, y * RECT_DIMS.y - 1.0);
+                        match fill_type {
+                            FillType::NoFill => {
+                                if !((cpos.x >= min.x && cpos.x <= max.x)
+                                    && (cpos.y == min.y || cpos.y == max.y))
+                                    && !((cpos.y >= min.y && cpos.y <= max.y)
+                                        && (cpos.x == min.x || cpos.x == max.x))
+                                {
+                                    continue;
+                                }
+                            }
+                            FillType::SolidFill => {
+                                if !((cpos.x >= min.x && cpos.x <= max.x)
+                                    && (cpos.y >= min.y && cpos.y <= max.y))
+                                {
+                                    continue;
+                                }
                             }
                         }
+                        self.set_pixel_at(i, sc);
+                    }
+                }
+                ToolKind::Fill => {
+                    if !is_mouse_button_pressed(MouseButton::Left) {
+                        break 'blk;
+                    }
 
-                        FillType::SolidFill => {
-                            if !((cpos.x >= min.x && cpos.x <= max.x)
-                                && (cpos.y >= min.y && cpos.y <= max.y))
-                            {
-                                continue;
-                            }
+                    let s = self
+                        .try_get_pixels_to_color(camera, ToolKind::Fill, &tool.info)
+                        .unwrap();
+                    for i in s.iter() {
+                        self.set_pixel_at(*i, sc);
+                    }
+                }
+
+                ToolKind::Line => {
+                    if tool.info.initial_loc.is_none() {
+                        if !is_mouse_button_down(MouseButton::Left) {
+                            break 'blk;
+                        }
+                        tool.info.initial_loc = Some(mouse_position().into());
+                    }
+
+                    tool.info.final_loc = Some(mouse_position().into());
+                    let s = self.try_get_pixels_to_color(camera, ToolKind::Line, &tool.info);
+
+                    if is_mouse_button_down(MouseButton::Left) {
+                        tool.info.pixel_indices = s;
+                        break 'blk;
+                    }
+
+                    if let Some(pis) = s {
+                        for i in pis.into_iter() {
+                            self.set_pixel_at(i, sc);
                         }
                     }
-                    active_layer.set_pixel(i, sc);
+                    tool.info = ToolInfo::default();
                 }
-            }
-
-            ToolKind::Fill => {
-                if !is_mouse_button_pressed(MouseButton::Left) {
-                    return;
-                }
-
-                let s = self
-                    .try_get_pixels_to_color(camera, ToolKind::Fill, &t.info)
-                    .unwrap();
-                let active_layer = self.active_layer_mut().unwrap();
-                for i in s.iter() {
-                    active_layer.set_pixel(*i, sc);
-                }
-            }
-
-            ToolKind::Line => {
-                if t.info.initial_loc.is_none() {
-                    if !is_mouse_button_down(MouseButton::Left) {
-                        return;
-                    }
-                    t.info.initial_loc = Some(mouse_position().into());
-                }
-
-                t.info.final_loc = Some(mouse_position().into());
-                let s = self.try_get_pixels_to_color(camera, ToolKind::Line, &t.info);
-
-                let active_layer = self.active_layer_mut().unwrap();
-
-                if is_mouse_button_down(MouseButton::Left) {
-                    t.info.pixel_indices = s;
-                    return;
-                }
-
-                if let Some(pis) = s {
-                    for i in pis.into_iter() {
-                        active_layer.set_pixel(i, sc);
-                    }
-                }
-                t.info = ToolInfo::default();
             }
         }
+
+        // Restore self.tool
+        self.tool = tool;
     }
 
     // Currently the time complexity is O(n), but i think we can make it better by using just
