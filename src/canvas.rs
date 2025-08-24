@@ -306,115 +306,107 @@ impl Canvas {
         let np = self.num_pixels;
         let sc = Some(self.selected_color);
 
-        // Restoring is done after the blk block
-        let mut tool = std::mem::take(&mut self.tool);
-
-        'blk: {
-            match tool.kind {
-                ToolKind::Pixel => {
-                    if !is_mouse_button_down(MouseButton::Left) {
-                        break 'blk;
-                    }
-                    self.set_pixel_at_mouse_position(sc, camera);
+        match self.tool.kind {
+            ToolKind::Pixel => {
+                if !is_mouse_button_down(MouseButton::Left) {
+                    return;
                 }
-                ToolKind::Eraser => {
-                    if !is_mouse_button_down(MouseButton::Left) {
-                        break 'blk;
-                    }
-
-                    self.erase_at_mouse_position(camera);
+                self.set_pixel_at_mouse_position(sc, camera);
+            }
+            ToolKind::Eraser => {
+                if !is_mouse_button_down(MouseButton::Left) {
+                    return;
                 }
 
-                ToolKind::Rect(fill_type) => {
-                    if tool.info.initial_loc.is_none() {
-                        if !is_mouse_button_down(MouseButton::Left) {
-                            break 'blk;
-                        }
-                        tool.info.initial_loc = Some(mouse_position().into());
+                self.erase_at_mouse_position(camera);
+            }
+
+            ToolKind::Rect(fill_type) => {
+                if self.tool.info.initial_loc.is_none() {
+                    if !is_mouse_button_down(MouseButton::Left) {
+                        return;
                     }
+                    self.tool.info.initial_loc = Some(mouse_position().into());
+                }
 
-                    tool.info.final_loc = Some(mouse_position().into());
+                self.tool.info.final_loc = Some(mouse_position().into());
 
-                    if is_mouse_button_down(MouseButton::Left) {
-                        break 'blk;
-                    }
+                if is_mouse_button_down(MouseButton::Left) {
+                    return;
+                }
 
-                    let rects = self.get_pos_from_tool_info(camera, &tool.info);
+                let rects = self.get_pos_from_tool_info(camera, &self.tool.info);
 
-                    tool.info = ToolInfo::default();
+                self.tool.info = ToolInfo::default();
 
-                    if rects.is_none() {
-                        break 'blk;
-                    }
-                    let (min, max) = rects.unwrap();
+                if rects.is_none() {
+                    return;
+                }
+                let (min, max) = rects.unwrap();
 
-                    for i in 0..(np.pow(2)) {
-                        let x = (i % np) as f32;
-                        let y = (i / np) as f32;
+                for i in 0..(np.pow(2)) {
+                    let x = (i % np) as f32;
+                    let y = (i / np) as f32;
 
-                        let cpos = vec2(x * RECT_DIMS.x - 1.0, y * RECT_DIMS.y - 1.0);
-                        match fill_type {
-                            FillType::NoFill => {
-                                if !((cpos.x >= min.x && cpos.x <= max.x)
-                                    && (cpos.y == min.y || cpos.y == max.y))
-                                    && !((cpos.y >= min.y && cpos.y <= max.y)
-                                        && (cpos.x == min.x || cpos.x == max.x))
-                                {
-                                    continue;
-                                }
-                            }
-                            FillType::SolidFill => {
-                                if !((cpos.x >= min.x && cpos.x <= max.x)
-                                    && (cpos.y >= min.y && cpos.y <= max.y))
-                                {
-                                    continue;
-                                }
+                    let cpos = vec2(x * RECT_DIMS.x - 1.0, y * RECT_DIMS.y - 1.0);
+                    match fill_type {
+                        FillType::NoFill => {
+                            if !((cpos.x >= min.x && cpos.x <= max.x)
+                                && (cpos.y == min.y || cpos.y == max.y))
+                                && !((cpos.y >= min.y && cpos.y <= max.y)
+                                    && (cpos.x == min.x || cpos.x == max.x))
+                            {
+                                continue;
                             }
                         }
+                        FillType::SolidFill => {
+                            if !((cpos.x >= min.x && cpos.x <= max.x)
+                                && (cpos.y >= min.y && cpos.y <= max.y))
+                            {
+                                continue;
+                            }
+                        }
+                    }
+                    self.set_pixel_at(i, sc);
+                }
+            }
+            ToolKind::Fill => {
+                if !is_mouse_button_pressed(MouseButton::Left) {
+                    return;
+                }
+
+                let s = self
+                    .try_get_pixels_to_color(camera, ToolKind::Fill, &self.tool.info)
+                    .unwrap();
+                for i in s.iter() {
+                    self.set_pixel_at(*i, sc);
+                }
+            }
+
+            ToolKind::Line => {
+                if self.tool.info.initial_loc.is_none() {
+                    if !is_mouse_button_down(MouseButton::Left) {
+                        return;
+                    }
+                    self.tool.info.initial_loc = Some(mouse_position().into());
+                }
+
+                self.tool.info.final_loc = Some(mouse_position().into());
+                let s = self.try_get_pixels_to_color(camera, ToolKind::Line, &self.tool.info);
+
+                if is_mouse_button_down(MouseButton::Left) {
+                    self.tool.info.pixel_indices = s;
+                    return;
+                }
+
+                if let Some(pis) = s {
+                    for i in pis.into_iter() {
                         self.set_pixel_at(i, sc);
                     }
                 }
-                ToolKind::Fill => {
-                    if !is_mouse_button_pressed(MouseButton::Left) {
-                        break 'blk;
-                    }
-
-                    let s = self
-                        .try_get_pixels_to_color(camera, ToolKind::Fill, &tool.info)
-                        .unwrap();
-                    for i in s.iter() {
-                        self.set_pixel_at(*i, sc);
-                    }
-                }
-
-                ToolKind::Line => {
-                    if tool.info.initial_loc.is_none() {
-                        if !is_mouse_button_down(MouseButton::Left) {
-                            break 'blk;
-                        }
-                        tool.info.initial_loc = Some(mouse_position().into());
-                    }
-
-                    tool.info.final_loc = Some(mouse_position().into());
-                    let s = self.try_get_pixels_to_color(camera, ToolKind::Line, &tool.info);
-
-                    if is_mouse_button_down(MouseButton::Left) {
-                        tool.info.pixel_indices = s;
-                        break 'blk;
-                    }
-
-                    if let Some(pis) = s {
-                        for i in pis.into_iter() {
-                            self.set_pixel_at(i, sc);
-                        }
-                    }
-                    tool.info = ToolInfo::default();
-                }
+                self.tool.info = ToolInfo::default();
             }
         }
-
-        // Restore self.tool
-        self.tool = tool;
     }
 
     // Currently the time complexity is O(n), but i think we can make it better by using just
