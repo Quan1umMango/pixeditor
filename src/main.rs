@@ -4,6 +4,7 @@ use macroquad::ui::{Skin, root_ui, widgets};
 
 mod canvas;
 mod project;
+mod tool_helper;
 
 use canvas::Canvas;
 use project::Project;

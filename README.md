@@ -10,10 +10,11 @@ A lightweight pixel art making tool.
 - Eraser
 - Rectangle (filled and unfilled)
 - Flood Fill 
+- Line Tool
 
 # TODO
 - [ ] Add saving functionality.
-- [ ] Fix draw line tool.
+- [-] Fix draw line tool.
 - [ ] Better UI.
 - [ ] Add layers.
 - [ ] Add loading from saved files.

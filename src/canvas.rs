@@ -1,4 +1,7 @@
 use crate::RECT_DIMS;
+
+use crate::tool_helper;
+
 use crate::{FillType, Layer, Tool, ToolInfo, ToolKind};
 use macroquad::prelude::*;
 
@@ -82,50 +85,27 @@ impl Canvas {
                 Some(out)
             }
             ToolKind::Line => {
-                let mut out = Vec::<usize>::new();
 
                 if info.initial_loc.is_none() || info.final_loc.is_none() {
-                    return Some(out);
+                    return Some(Vec::new());
                 }
 
                 let res = self.get_pos_from_tool_info_unordered(camera, info);
                 if res.is_none() {
-                    return Some(out);
+                    return Some(Vec::new());
                 }
                 let (start, end) = res.unwrap();
 
                 let si = self.get_pixel_index_from_position(start).unwrap();
                 let ei = self.get_pixel_index_from_position(end).unwrap();
 
-                let s_coords = (si % self.num_pixels, si / self.num_pixels);
-                let e_coords = (ei % self.num_pixels, ei / self.num_pixels);
+                let x0 = si % self.num_pixels;
+                let y0 = si / self.num_pixels;
 
-                // Slope == inf
-                if e_coords.1 == s_coords.1 {
-                    for x in s_coords.0..=e_coords.0 {
-                        out.push(x + s_coords.1 * self.num_pixels);
-                    }
-                    return Some(out);
-                }
+                let x1 = ei % self.num_pixels;
+                let y1 = ei / self.num_pixels;
 
-                let slope = (e_coords.0 as f32 - s_coords.0 as f32)
-                    / (e_coords.1 as f32 - s_coords.1 as f32);
-
-                if slope == 0. {
-                    for y in s_coords.1..=e_coords.1 {
-                        out.push(s_coords.0 + y * self.num_pixels);
-                    }
-                    return Some(out);
-                }
-
-                for x in s_coords.0..=e_coords.0 {
-                    // m = (x1-x0)/(y1-y0) => y1 = (x1-x0)/m + y0
-                    let yf32 = (x as f32 - s_coords.0 as f32) / slope + s_coords.1 as f32;
-                    let index = ((yf32.floor() * self.num_pixels as f32) + x as f32) as usize;
-                    out.push(index);
-                }
-
-                Some(out)
+                return Some(tool_helper::get_line_pixels(self.num_pixels,(x0,y0),(x1,y1)));
             }
             _ => None,
         }
