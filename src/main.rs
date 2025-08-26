@@ -264,6 +264,7 @@ impl Layer {
     pub fn set_pixel_color(&mut self, index: usize, c: Color) {
         self.data[index] = Some(c);
     }
+
 }
 
 #[macroquad::main("Pixeditor")]

@@ -461,4 +461,29 @@ impl Canvas {
     pub fn set_selected_color(&mut self, nc: Color) {
         self.selected_color = nc;
     }
+
+
+    pub fn to_image(&self) -> Image {
+       let mut img = Image::gen_image_color(self.num_pixels as u16,self.num_pixels as u16,Color::from_rgba(0,0,0,0)); 
+
+       let active_layer = self.active_layer().unwrap();
+       for i in 0..self.num_pixels.pow(2) {
+
+           let x = (i % self.num_pixels) as u32;
+           // We have to do this because otherwise the image is upside down
+           let y = (self.num_pixels - 1 - (i / self.num_pixels)) as u32;
+           if let Some(c) = active_layer.data[i] {
+                img.set_pixel(x,y,c);
+                continue;
+           }
+
+           for l in self.layers.iter() {
+               if let Some(c) = l.data[i] {
+                   img.set_pixel(x,y,c);
+                   continue;
+               }
+           }
+       }
+       img
+    }
 }

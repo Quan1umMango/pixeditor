@@ -18,14 +18,17 @@ pub struct Project {
     canvas: Canvas,
     camera: Camera2D,
     move_camera_data: Option<MoveCameraData>,
+
+    save_options:SaveOptions
 }
 
 impl Project {
     pub fn new(project_name: String, num_pixels: usize) -> Self {
         Self {
-            project_name,
+            project_name:project_name.clone(),
             num_pixels,
             canvas: Canvas::new(num_pixels),
+            save_options:SaveOptions::with_name(project_name),
             ..Default::default()
         }
     }
@@ -92,6 +95,23 @@ impl Project {
 
             self.ui_processed = egui_ctx.wants_pointer_input() || egui_ctx.is_pointer_over_area();
 
+
+            // Top Menu Bar
+            egui::TopBottomPanel::top("top bar").show(egui_ctx, |ui| {
+                egui::menu::bar(ui, |ui| {
+                    ui.menu_button("File", |ui| {
+                        if ui.button("Save").clicked() {
+                            self.handle_save();
+                        }
+                        if ui.button("Save As").clicked() {
+                            self.handle_save_as();
+                        }
+                    });                 
+                });
+
+            });
+
+            // Tools
             egui::Window::new("Tools").show(egui_ctx, |ui| {
                 let single_pixel_btn = egui::ImageButton::new(PAINT_BRUSH_ICON);
                 let eraser_btn = egui::ImageButton::new(ERASER_ICON);
@@ -135,4 +155,70 @@ impl Project {
         self.canvas.draw(&self.camera);
         self.draw_ui();
     }
+
+    pub fn handle_save(&mut self) {
+       if self.save_options.name.is_none() || self.save_options.path.is_none() {
+            self.handle_save_as();
+            return;
+       }
+       self.save();
+    }
+
+    pub fn handle_save_as(&mut self) {
+        use native_dialog::DialogBuilder;
+        use std::path::Path;
+
+        let path_res = DialogBuilder::file()
+            .set_location("~/Desktop")
+            // Currently using macroquad::texture::Image which only supports PNG
+            // TODO: Switch to use Image crate and add other extension support
+            .add_filter("PNG Image", &["png"])
+            .set_filename(self.save_options.name.as_ref().unwrap_or(&String::new()))
+            .save_single_file()
+            .show()
+            .unwrap();
+
+        // User clicked close on save window
+        if path_res.is_none() { return; }
+
+        let path_v = path_res.unwrap();
+        let path = Path::new(path_v.as_os_str());
+        let file_name = path.file_name().unwrap().to_os_string().into_string().unwrap();
+        let path_string = path.as_os_str().to_os_string().into_string().unwrap();
+        self.save_options.set_name(file_name);
+        self.save_options.set_path(path_string);
+
+        self.save();
+    }
+
+    pub fn save(&mut self) {
+        let img = self.canvas.to_image();
+        // TODO: Handle these errors
+        img.export_png(self.save_options.path.as_ref().unwrap());
+    }
+}
+
+#[derive(Default)]
+pub struct SaveOptions {
+    name:Option<String>,
+    path:Option<String>
+    //ext:Option<String>,
+}
+
+impl SaveOptions {
+    pub fn with_name(name:String) -> Self {
+        Self{ 
+            name: if name.is_empty() { None } else { Some(name) },
+            ..Default::default() 
+        }
+    }
+
+    pub fn set_name(&mut self, name:String) {
+        self.name = if name.is_empty() { None } else { Some(name) };
+    }
+
+    pub fn set_path(&mut self, path:String) {
+        self.path = if path.is_empty() { None } else { Some(path) };
+    }
+
 }
