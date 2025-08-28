@@ -1,4 +1,4 @@
-use crate::Color;
+use crate::{ Color, canvas::LayerId };
 
 #[derive(Debug,Clone,PartialEq)]
 pub enum Action {
@@ -9,7 +9,7 @@ pub enum Action {
 pub struct DrawPixelsInfo {
     // index of the pixel, from and to colors of the pixel (previous and new color)
     pub pixels:Vec<(usize,DrawInfo)>,
-    pub layer_id:usize,
+    pub layer_id:LayerId,
 }
 
 #[derive(Debug,Clone,PartialEq)]
@@ -19,7 +19,7 @@ pub struct DrawInfo {
 }
 
 impl DrawPixelsInfo {
-    pub fn new(pixels:Vec<(usize,DrawInfo)>,layer_id:usize) -> DrawPixelsInfo {
+    pub fn new(pixels:Vec<(usize,DrawInfo)>,layer_id:LayerId) -> DrawPixelsInfo {
         DrawPixelsInfo {
             pixels,
             layer_id,
@@ -37,11 +37,11 @@ impl DrawInfo {
 
 impl Action {
 
-    pub fn draw_pixels(pixels:Vec<(usize,DrawInfo)>,layer_id:usize) -> Action {
+    pub fn draw_pixels(pixels:Vec<(usize,DrawInfo)>,layer_id:uuid::Uuid) -> Action {
         Action::DrawPixels(DrawPixelsInfo::new(pixels,layer_id))
     }
 
-    pub fn get_layer_id(&self) -> Option<usize> {
+    pub fn get_layer_id(&self) -> Option<LayerId> {
         match self {
             Action::DrawPixels(info) => return Some(info.layer_id),
             _ => None,

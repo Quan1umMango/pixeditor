@@ -13,7 +13,7 @@ A lightweight pixel art making tool.
 - Line Tool
 
 # TODO
-- [x ] Add saving functionality.
+- [x] Add saving functionality.
 - [x] Fix draw line tool.
 - [ ] Better UI.
 - [ ] Add layers.

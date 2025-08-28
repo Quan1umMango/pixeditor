@@ -9,3 +9,5 @@ macroquad = "0.4.14"
 egui_extras = { version = "0.31.1", features = ["image"] }
 image = { version = "0.25", features = ["jpeg", "png"] } # Add the types you want support for
 native-dialog = "0.9.0"
+uuid = { version = "1.18.0", features = ["v4"] }
+indexmap = "2.11.0"

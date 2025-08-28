@@ -2,27 +2,37 @@ use crate::RECT_DIMS;
 
 use crate::tool_helper;
 use crate::undo_redo::{Action, DrawPixelsInfo,DrawInfo};
-
 use crate::{FillType, Layer, Tool, ToolInfo, ToolKind};
+
 use macroquad::prelude::*;
+use uuid::Uuid;
+use indexmap::IndexMap;
+
+pub type LayerId = Uuid;
+
 
 /// Handles all the things related to the actual drawing, like layers, inactive layers, tool
 /// previews etc.
 #[derive(Default)]
 pub struct Canvas {
     num_pixels: usize,
-    active_layer: usize,
-    layers: Vec<Layer>,
+    active_layer: LayerId ,
+    layers: IndexMap<Uuid,Layer>,
     tool: Tool,
     selected_color: Color,
 }
 
 impl Canvas {
     pub fn new(num_pixels: usize) -> Self {
+        let mut map = IndexMap::<LayerId,Layer>::new();
+        let layer = Layer::new(num_pixels);
+        let id = LayerId::new_v4();
+        map.insert(id,layer);
+
         Self {
             num_pixels,
-            layers: vec![Layer::new(num_pixels)],
-            active_layer: 0,
+            layers: map,
+            active_layer: id,
             selected_color: RED,
             ..Default::default()
         }
@@ -169,7 +179,7 @@ impl Canvas {
                 );
             } else {
                 'inner: {
-                    for l in self.layers.iter() {
+                    for (_id,l) in self.layers.iter() {
                         if l.data[i].is_some() {
                             draw_rectangle(
                                 x * RECT_DIMS.x - 1.0,
@@ -473,11 +483,11 @@ impl Canvas {
     }
 
     pub fn active_layer(&self) -> Option<&Layer> {
-        self.layers.get(self.active_layer)
+        self.layers.get(&self.active_layer)
     }
 
     pub fn active_layer_mut(&mut self) -> Option<&mut Layer> {
-        self.layers.get_mut(self.active_layer)
+        self.layers.get_mut(&self.active_layer)
     }
 
     pub fn selected_color(&self) -> Color {
@@ -502,7 +512,7 @@ impl Canvas {
                 continue;
            }
 
-           for l in self.layers.iter() {
+           for (_id,l) in self.layers.iter() {
                if let Some(c) = l.data[i] {
                    img.set_pixel(x,y,c);
                    continue;
@@ -515,7 +525,7 @@ impl Canvas {
 
     pub fn undo(&mut self, info:&DrawPixelsInfo) {
         let layer_id = info.layer_id;
-        if let Some(layer) = self.layers.get_mut(layer_id) {
+        if let Some(layer) = self.get_layer_mut(layer_id) {
             for (index,draw_info) in info.pixels.iter() {
                 layer.data[*index] = draw_info.from;
             }
@@ -524,10 +534,31 @@ impl Canvas {
 
     pub fn redo(&mut self, info:&DrawPixelsInfo) {
         let layer_id = info.layer_id;
-        if let Some(layer) = self.layers.get_mut(layer_id) {
+        if let Some(layer) = self.get_layer_mut(layer_id) {
             for (index,draw_info) in info.pixels.iter() {
                 layer.data[*index] = draw_info.to;
             }
         }
+    }
+
+    pub fn get_layer(&self,id:LayerId) -> Option<&Layer> {
+        self.layers.get(&id)
+    }
+
+    pub fn get_layer_mut(&mut self,id:LayerId) -> Option<&mut Layer> {
+        self.layers.get_mut(&id)
+    }
+
+
+    /// Panics if new_layer_id is not a valid id.
+    pub fn set_active_layer_as(&mut self, new_layer_id:LayerId) {
+       if self.get_layer(new_layer_id).is_none() {
+            panic!("Invalid Layer Id: {:?}",new_layer_id);
+       }
+       self.active_layer = new_layer_id;
+    }
+
+    pub fn layers_iter(&self) -> Iter<'_,LayerId,&Layer> {
+        self.layers.iter()
     }
 }

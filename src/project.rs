@@ -22,6 +22,7 @@ pub struct Project {
     save_options:SaveOptions,
 
     action_manager:ActionsManager,
+
 }
 
 impl Project {
@@ -158,6 +159,7 @@ impl Project {
                 ui.color_edit_button_rgba_unmultiplied(&mut c);
                 self.canvas.set_selected_color(Color::from_vec(c.into()));
             });
+
         });
 
         egui_macroquad::draw();
