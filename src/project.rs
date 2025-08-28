@@ -215,7 +215,7 @@ impl Project {
         if act.is_none() { return; }
         match act.unwrap() {
             Action::DrawPixels(info) => {
-                self.canvas.undo(&info);
+                self.canvas.undo(info);
             }
         }
     }
@@ -225,7 +225,7 @@ impl Project {
         if act.is_none() { return; }
         match act.unwrap() {
             Action::DrawPixels(info) => {
-                self.canvas.redo(&info);
+                self.canvas.redo(info);
             }
         }
     }

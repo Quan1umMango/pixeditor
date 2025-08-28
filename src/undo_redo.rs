@@ -63,18 +63,18 @@ impl ActionsManager {
         }
     }
 
-    pub fn undo(&mut self) -> Option<Action> {
+    pub fn undo(&mut self) -> Option<&Action> {
         if let Some(act) = self.undo_buf.pop() {
-            self.redo_buf.push(act.clone());
-            return Some(act)
+            self.redo_buf.push(act);
+            return self.redo_buf.last(); 
         }
         None
     }
 
-    pub fn redo(&mut self) -> Option<Action> {
+    pub fn redo(&mut self) -> Option<&Action> {
         if let Some(act) = self.redo_buf.pop() {
-            self.undo_buf.push(act.clone());
-            return Some(act) 
+            self.undo_buf.push(act);
+            return self.undo_buf.last(); 
         }
         None
     }
