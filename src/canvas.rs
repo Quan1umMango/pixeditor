@@ -1,6 +1,7 @@
 use crate::RECT_DIMS;
 
 use crate::tool_helper;
+use crate::undo_redo::{Action, DrawPixelsInfo,DrawInfo};
 
 use crate::{FillType, Layer, Tool, ToolInfo, ToolKind};
 use macroquad::prelude::*;
@@ -254,18 +255,23 @@ impl Canvas {
         self.set_pixel_at_mouse_position(Some(self.selected_color), camera);
     }
 
-    pub fn erase_at_mouse_position(&mut self, camera: &Camera2D) {
-        self.set_pixel_at_mouse_position(None, camera);
+    pub fn erase_at_mouse_position(&mut self, camera: &Camera2D) -> Option<DrawPixelsInfo> {
+        self.set_pixel_at_mouse_position(None, camera)
     }
 
-    pub fn set_pixel_at_mouse_position(&mut self, color: Option<Color>, camera: &Camera2D) {
+    pub fn set_pixel_at_mouse_position(&mut self, color: Option<Color>, camera: &Camera2D) -> Option<DrawPixelsInfo> {
         let mp = camera.screen_to_world(mouse_position().into());
         let index = self.get_pixel_index_from_position(mp);
+        let layer_id = self.active_layer;
         let active_layer = self.active_layer_mut().unwrap();
 
         if let Some(index) = index {
+            let prev = active_layer.data[index];
             active_layer.set_pixel(index, color);
+            let dinfo = DrawInfo{to:color,from:prev};
+            return Some(DrawPixelsInfo::new(vec![(index,dinfo)],layer_id));
         }
+        None
     }
 
     pub fn set_pixel_at(&mut self, index: usize, color: Option<Color>) {
@@ -282,29 +288,31 @@ impl Canvas {
         self.get_pixel_index_from_position(mp)
     }
 
-    pub fn use_tool_at_mouse_position(&mut self, camera: &Camera2D) {
+    pub fn use_tool_at_mouse_position(&mut self, camera: &Camera2D) -> Option<DrawPixelsInfo> {
         let np = self.num_pixels;
         let sc = Some(self.selected_color);
+        let layer_id = self.active_layer;
 
         match self.tool.kind {
             ToolKind::Pixel => {
                 if !is_mouse_button_down(MouseButton::Left) {
-                    return;
+                    return None;
                 }
-                self.set_pixel_at_mouse_position(sc, camera);
+                return self.set_pixel_at_mouse_position(sc, camera);
             }
             ToolKind::Eraser => {
                 if !is_mouse_button_down(MouseButton::Left) {
-                    return;
+                    return None;
                 }
 
-                self.erase_at_mouse_position(camera);
+                return self.erase_at_mouse_position(camera);
+                
             }
 
             ToolKind::Rect(fill_type) => {
                 if self.tool.info.initial_loc.is_none() {
                     if !is_mouse_button_down(MouseButton::Left) {
-                        return;
+                        return None;
                     }
                     self.tool.info.initial_loc = Some(mouse_position().into());
                 }
@@ -312,7 +320,7 @@ impl Canvas {
                 self.tool.info.final_loc = Some(mouse_position().into());
 
                 if is_mouse_button_down(MouseButton::Left) {
-                    return;
+                    return None;
                 }
 
                 let rects = self.get_pos_from_tool_info(camera, &self.tool.info);
@@ -320,9 +328,10 @@ impl Canvas {
                 self.tool.info = ToolInfo::default();
 
                 if rects.is_none() {
-                    return;
+                    return None;
                 }
                 let (min, max) = rects.unwrap();
+                let mut drawn_pixels = Vec::<(usize,DrawInfo)>::new();
 
                 for i in 0..(np.pow(2)) {
                     let x = (i % np) as f32;
@@ -347,26 +356,37 @@ impl Canvas {
                             }
                         }
                     }
+
+                    let from = self.active_layer().unwrap().data[i];
+                    let dinfo = DrawInfo::new(from,sc);
+                    drawn_pixels.push((i,dinfo)); 
                     self.set_pixel_at(i, sc);
                 }
+                let dpi = DrawPixelsInfo::new(drawn_pixels, layer_id);
+                return Some(dpi);
             }
             ToolKind::Fill => {
                 if !is_mouse_button_pressed(MouseButton::Left) {
-                    return;
+                    return None;
                 }
 
                 let s = self
                     .try_get_pixels_to_color(camera, ToolKind::Fill, &self.tool.info)
                     .unwrap();
+                let mut drawn_pixels = Vec::<(usize,DrawInfo)>::new();
                 for i in s.iter() {
+                    let from = self.active_layer().unwrap().data[*i];
+                    let dinfo = DrawInfo::new(from,sc);
+                    drawn_pixels.push((*i,dinfo));
                     self.set_pixel_at(*i, sc);
                 }
+                return Some(DrawPixelsInfo::new(drawn_pixels,layer_id));
             }
 
             ToolKind::Line => {
                 if self.tool.info.initial_loc.is_none() {
                     if !is_mouse_button_down(MouseButton::Left) {
-                        return;
+                        return None;
                     }
                     self.tool.info.initial_loc = Some(mouse_position().into());
                 }
@@ -376,15 +396,20 @@ impl Canvas {
 
                 if is_mouse_button_down(MouseButton::Left) {
                     self.tool.info.pixel_indices = s;
-                    return;
+                    return None;
                 }
 
+                self.tool.info = ToolInfo::default();
+
+                let mut drawn_pixels = Vec::new();
                 if let Some(pis) = s {
                     for i in pis.into_iter() {
+                        let from = self.active_layer().unwrap().data[i];
+                        drawn_pixels.push((i,DrawInfo::new(from,sc)));
                         self.set_pixel_at(i, sc);
                     }
                 }
-                self.tool.info = ToolInfo::default();
+                return Some(DrawPixelsInfo::new(drawn_pixels,layer_id));
             }
         }
     }
@@ -485,5 +510,24 @@ impl Canvas {
            }
        }
        img
+    }
+
+
+    pub fn undo(&mut self, info:&DrawPixelsInfo) {
+        let layer_id = info.layer_id;
+        if let Some(layer) = self.layers.get_mut(layer_id) {
+            for (index,draw_info) in info.pixels.iter() {
+                layer.data[*index] = draw_info.from;
+            }
+        }
+    }
+
+    pub fn redo(&mut self, info:&DrawPixelsInfo) {
+        let layer_id = info.layer_id;
+        if let Some(layer) = self.layers.get_mut(layer_id) {
+            for (index,draw_info) in info.pixels.iter() {
+                layer.data[*index] = draw_info.to;
+            }
+        }
     }
 }

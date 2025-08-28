@@ -1,4 +1,4 @@
-use crate::{Canvas, FillType, MoveCameraData, Tool};
+use crate::{Canvas, FillType, MoveCameraData, Tool, undo_redo::{ ActionsManager, Action }};
 use crate::{
     ERASER_ICON, ICON_SIZE, MAX_SCROLL, MAX_SCROLL_NEG, MOUSE_MOVE_BY, MOVE_CAMERA_KEY,
     PAINT_BRUSH_ICON, SCROLL_BY,
@@ -19,7 +19,9 @@ pub struct Project {
     camera: Camera2D,
     move_camera_data: Option<MoveCameraData>,
 
-    save_options:SaveOptions
+    save_options:SaveOptions,
+
+    action_manager:ActionsManager,
 }
 
 impl Project {
@@ -38,6 +40,7 @@ impl Project {
             return;
         }
 
+        self.handle_shortcuts();
         self.handle_scroll();
 
         if is_key_down(MOVE_CAMERA_KEY) {
@@ -65,7 +68,17 @@ impl Project {
     }
 
     pub fn use_tool(&mut self) {
-        self.canvas.use_tool_at_mouse_position(&self.camera);
+        if let Some(drawn_pixels) = self.canvas.use_tool_at_mouse_position(&self.camera) {
+            let action = Action::DrawPixels(drawn_pixels);
+            self.action_manager.add_action(action);
+        }
+        
+    }
+
+    pub fn handle_shortcuts(&mut self)  {
+        if !is_key_down(KeyCode::LeftControl) { return; }
+        if is_key_down(KeyCode::Z) { self.undo(); }
+        if is_key_down(KeyCode::Y) { self.redo(); }
     }
 
     pub fn handle_scroll(&mut self) {
@@ -195,6 +208,26 @@ impl Project {
         let img = self.canvas.to_image();
         // TODO: Handle these errors
         img.export_png(self.save_options.path.as_ref().unwrap());
+    }
+
+    pub fn undo(&mut self) {
+        let act = self.action_manager.undo();
+        if act.is_none() { return; }
+        match act.unwrap() {
+            Action::DrawPixels(info) => {
+                self.canvas.undo(&info);
+            }
+        }
+    }
+
+    pub fn redo(&mut self) {
+        let act = self.action_manager.redo();
+        if act.is_none() { return; }
+        match act.unwrap() {
+            Action::DrawPixels(info) => {
+                self.canvas.redo(&info);
+            }
+        }
     }
 }
 

@@ -2,6 +2,7 @@ use egui_macroquad::egui;
 use macroquad::prelude::*;
 use macroquad::ui::{Skin, root_ui, widgets};
 
+mod undo_redo;
 mod canvas;
 mod project;
 mod tool_helper;
@@ -32,7 +33,7 @@ pub enum AppState {
     #[default]
     MainMenu,
     NewMenu(NewMenuState),
-    Drawing(Project),
+    Drawing(Box<Project>),
 }
 
 #[derive(Default, Clone)]
@@ -114,10 +115,10 @@ impl App {
 
                             if ui.button("Done!").clicked() {
                                 if let Ok(v) = st.num_pixels_string.parse::<usize>() {
-                                    new_state = Some(AppState::Drawing(Project::new(
+                                    new_state = Some(AppState::Drawing(Box::new(Project::new(
                                         st.file_name.clone(),
                                         v,
-                                    )));
+                                    ))));
                                 }
                             }
                         });
