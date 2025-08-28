@@ -558,7 +558,21 @@ impl Canvas {
        self.active_layer = new_layer_id;
     }
 
-    pub fn layers_iter(&self) -> Iter<'_,LayerId,&Layer> {
-        self.layers.iter()
+    pub fn layers(&self) -> &IndexMap<LayerId,Layer> {
+        &self.layers
+    }
+    
+    pub fn active_layer_id(&self) ->LayerId {
+        self.active_layer
+    }
+
+    pub fn create_new_layer(&mut self)  {
+        let nl = Layer::new(self.num_pixels);
+        let id = LayerId::new_v4();
+        self.layers.insert(id,nl);
+    }
+
+    pub fn delete_layer(&mut self, id:LayerId)  {
+        self.layers.shift_remove(&id);
     }
 }

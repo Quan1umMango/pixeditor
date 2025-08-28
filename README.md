@@ -16,6 +16,8 @@ A lightweight pixel art making tool.
 - [x] Add saving functionality.
 - [x] Fix draw line tool.
 - [ ] Better UI.
-- [ ] Add layers.
+- [x] Add layers.
 - [ ] Add loading from saved files.
+- [ ] Add previews for layers.
+
 

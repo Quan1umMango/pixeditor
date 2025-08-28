@@ -160,6 +160,35 @@ impl Project {
                 self.canvas.set_selected_color(Color::from_vec(c.into()));
             });
 
+
+            // Layer selection
+            egui::Window::new("Layers").show(egui_ctx, |ui| {
+            
+                if ui.button("Add new layer").clicked() {
+                    self.canvas.create_new_layer();
+                }
+
+                let mut layers_to_delete = Vec::<crate::canvas::LayerId>::new();
+
+                let mut selected = self.canvas.active_layer_id();
+                for (i,(id,_layer)) in self.canvas.layers().iter().enumerate() {
+
+                    ui.horizontal(|ui| {
+                        ui.radio_value(&mut selected,*id,format!("Layer {i}"));
+                        if ui.button("Delete").clicked() {
+                            layers_to_delete.push(*id);
+                        }
+                    });
+                }
+
+                for id in layers_to_delete.into_iter() {
+                    //if self.canvas.layers().len() == 1 { break; }
+                    if id == self.canvas.active_layer_id() || selected == id { continue; }
+                    self.canvas.delete_layer(id);
+                }
+                self.canvas.set_active_layer_as(selected);
+            });
+
         });
 
         egui_macroquad::draw();
@@ -237,7 +266,6 @@ impl Project {
 pub struct SaveOptions {
     name:Option<String>,
     path:Option<String>
-    //ext:Option<String>,
 }
 
 impl SaveOptions {
