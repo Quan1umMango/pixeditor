@@ -6,6 +6,7 @@ mod undo_redo;
 mod canvas;
 mod project;
 mod tool_helper;
+mod icons;
 
 use canvas::Canvas;
 use project::Project;
@@ -21,12 +22,6 @@ const MAX_SCROLL: Vec2 = vec2(3., 3.);
 const MAX_SCROLL_NEG: Vec2 = vec2(0.1, 0.1);
 const SCROLL_BY: f32 = 0.1;
 const MOUSE_MOVE_BY: f32 = 0.01;
-
-const ICON_SIZE: [f32; 2] = [25., 25.];
-
-const ERASER_ICON: egui::widgets::ImageSource = egui::include_image!("../assets/icons/eraser.png");
-const PAINT_BRUSH_ICON: egui::widgets::ImageSource =
-    egui::include_image!("../assets/icons/paintbrush.png");
 
 #[derive(Default)]
 pub enum AppState {

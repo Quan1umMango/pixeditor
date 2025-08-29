@@ -1,8 +1,8 @@
 use crate::{Canvas, FillType, MoveCameraData, Tool, undo_redo::{ ActionsManager, Action }};
 use crate::{
-    ERASER_ICON, ICON_SIZE, MAX_SCROLL, MAX_SCROLL_NEG, MOUSE_MOVE_BY, MOVE_CAMERA_KEY,
-    PAINT_BRUSH_ICON, SCROLL_BY,
+    SCROLL_BY, MAX_SCROLL, MAX_SCROLL_NEG, MOUSE_MOVE_BY, MOVE_CAMERA_KEY,
 };
+
 use egui_macroquad::egui;
 use macroquad::prelude::*;
 use macroquad::ui::root_ui;
@@ -127,29 +127,41 @@ impl Project {
 
             // Tools
             egui::Window::new("Tools").show(egui_ctx, |ui| {
+                use crate::icons::*;
                 let single_pixel_btn = egui::ImageButton::new(PAINT_BRUSH_ICON);
                 let eraser_btn = egui::ImageButton::new(ERASER_ICON);
+                let rect_border_btn = egui::ImageButton::new(RECT_BORDER_ICON);
+                let rect_filled_btn = egui::ImageButton::new(RECT_FILLED_ICON);
+                let fill_btn = egui::ImageButton::new(FILL_ICON);
+                let line_btn = egui::ImageButton::new(LINE_ICON);
+
                 let single_pixel_resp = ui.add_sized(ICON_SIZE, single_pixel_btn);
+
+                let eraser_resp = ui.add_sized(ICON_SIZE, eraser_btn);
+                let rect_border_resp = ui.add_sized(ICON_SIZE,rect_border_btn);
+                let rect_filled_resp = ui.add_sized(ICON_SIZE,rect_filled_btn);
+                let fill_resp = ui.add_sized(ICON_SIZE,fill_btn);
+                let line_resp = ui.add_sized(ICON_SIZE,line_btn);
+
                 if single_pixel_resp.clicked() {
                     self.canvas.set_tool(Tool::pixel());
                 }
-                let eraser_resp = ui.add_sized(ICON_SIZE, eraser_btn);
                 if eraser_resp.clicked() {
                     self.canvas.set_tool(Tool::eraser());
                 }
 
-                if ui.button("rect borders").clicked() {
+                if rect_border_resp.clicked() {
                     self.canvas.set_tool(Tool::rect(FillType::NoFill));
                 }
 
-                if ui.button("filled rect").clicked() {
+                if rect_filled_resp.clicked() {
                     self.canvas.set_tool(Tool::rect(FillType::SolidFill));
                 }
 
-                if ui.button("flood fill").clicked() {
+                if fill_resp.clicked() {
                     self.canvas.set_tool(Tool::fill());
                 }
-                if ui.button("line").clicked() {
+                if line_resp.clicked() {
                     self.canvas.set_tool(Tool::line());
                 }
             });

@@ -18,6 +18,6 @@ A lightweight pixel art making tool.
 - [ ] Better UI.
 - [x] Add layers.
 - [ ] Add loading from saved files.
-- [ ] Add previews for layers.
+- [x] Add previews for layers.
 
 
