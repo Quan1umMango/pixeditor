@@ -1,7 +1,7 @@
 use crate::RECT_DIMS;
 
 use crate::tool_helper;
-use crate::undo_redo::{Action, DrawPixelsInfo,DrawInfo};
+use crate::undo_redo::{DrawPixelsInfo,DrawInfo};
 use crate::{FillType, Layer, Tool, ToolInfo, ToolKind};
 
 use macroquad::prelude::*;
@@ -498,7 +498,8 @@ impl Canvas {
     }
 
 
-    pub fn to_image(&self) -> Image {
+    /// Creates an image based on all layers
+    pub fn to_image_all(&self) -> Image {
        let mut img = Image::gen_image_color(self.num_pixels as u16,self.num_pixels as u16,Color::from_rgba(0,0,0,0)); 
 
        let active_layer = self.active_layer().unwrap();

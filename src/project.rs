@@ -27,7 +27,7 @@ pub struct Project {
 
 impl Project {
     pub fn new(project_name: String, num_pixels: usize) -> Self {
-        Self {
+       Self {
             project_name:project_name.clone(),
             num_pixels,
             canvas: Canvas::new(num_pixels),
@@ -163,7 +163,6 @@ impl Project {
 
             // Layer selection
             egui::Window::new("Layers").show(egui_ctx, |ui| {
-            
                 if ui.button("Add new layer").clicked() {
                     self.canvas.create_new_layer();
                 }
@@ -171,9 +170,17 @@ impl Project {
                 let mut layers_to_delete = Vec::<crate::canvas::LayerId>::new();
 
                 let mut selected = self.canvas.active_layer_id();
-                for (i,(id,_layer)) in self.canvas.layers().iter().enumerate() {
+                for (i,(id,layer)) in self.canvas.layers().iter().enumerate() {
 
+                    let layer_img = layer.to_image_unflipped();
+                    let bytes = layer_img.bytes;
+                    let img = egui::ColorImage::from_rgba_premultiplied([self.num_pixels;2],&bytes);
+                    let texture_handle = egui_ctx.load_texture(format!("layer{i}"),img,egui::TextureOptions::LINEAR);
+                    let sized_image = egui::load::SizedTexture::new(texture_handle.id(),[self.num_pixels as f32;2]);
+                    let image = egui::Image::from_texture(sized_image);
+                    
                     ui.horizontal(|ui| {
+                        ui.add(image);
                         ui.radio_value(&mut selected,*id,format!("Layer {i}"));
                         if ui.button("Delete").clicked() {
                             layers_to_delete.push(*id);
@@ -182,7 +189,6 @@ impl Project {
                 }
 
                 for id in layers_to_delete.into_iter() {
-                    //if self.canvas.layers().len() == 1 { break; }
                     if id == self.canvas.active_layer_id() || selected == id { continue; }
                     self.canvas.delete_layer(id);
                 }
@@ -236,7 +242,7 @@ impl Project {
     }
 
     pub fn save(&mut self) {
-        let img = self.canvas.to_image();
+        let img = self.canvas.to_image_all();
         // TODO: Handle these errors
         img.export_png(self.save_options.path.as_ref().unwrap());
     }

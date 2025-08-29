@@ -266,6 +266,36 @@ impl Layer {
         self.data[index] = Some(c);
     }
 
+    /// Flips the image along y-axis. See unflipped version for this function ot achieve otherwise
+    pub fn to_image(&self) -> Image {
+        let mut img = Image::gen_image_color(self.num_pixels as u16,self.num_pixels as u16,Color::from_rgba(0,0,0,0)); 
+        for (i,p) in self.data.iter().enumerate() {
+            let x = (i % self.num_pixels) as u32;
+            // We have to do this because otherwise the image is upside down
+            let y = (self.num_pixels - 1 - (i / self.num_pixels)) as u32;
+
+            if let Some(c) = p {
+                img.set_pixel(x,y,*c);
+            }
+        }
+
+       img
+    }
+
+    pub fn to_image_unflipped(&self) -> Image {
+        let mut img = Image::gen_image_color(self.num_pixels as u16,self.num_pixels as u16,Color::from_rgba(0,0,0,0)); 
+        for (i,p) in self.data.iter().enumerate() {
+            let x = (i % self.num_pixels) as u32;
+            let y = (i / self.num_pixels) as u32;
+
+            if let Some(c) = p {
+                img.set_pixel(x,y,*c);
+            }
+        }
+
+       img
+    }
+
 }
 
 #[macroquad::main("Pixeditor")]

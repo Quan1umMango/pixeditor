@@ -14,18 +14,16 @@ pub fn get_line_pixels(num_pixels: usize, p0: (usize, usize), p1: (usize, usize)
 
     if y1.abs_diff(y0) < x1.abs_diff(x0) {
         if x0 > x1 {
-            return plot_line_low(num_pixels, x1, y1, x0, y0);
+            plot_line_low(num_pixels, x1, y1, x0, y0)
         } else {
-            return plot_line_low(num_pixels, x0, y0, x1, y1);
+            plot_line_low(num_pixels, x0, y0, x1, y1)
         }
     }
 
-    else {
-        if y0 > y1 {
-            return plot_line_high(num_pixels, x1, y1, x0, y0);
-        } else {
-            return plot_line_high(num_pixels, x0, y0, x1, y1);
-        }
+    else if y0 > y1 {
+        plot_line_high(num_pixels, x1, y1, x0, y0)
+    } else {
+        plot_line_high(num_pixels, x0, y0, x1, y1)
     }
 }
 

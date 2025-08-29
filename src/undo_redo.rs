@@ -43,8 +43,7 @@ impl Action {
 
     pub fn get_layer_id(&self) -> Option<LayerId> {
         match self {
-            Action::DrawPixels(info) => return Some(info.layer_id),
-            _ => None,
+            Action::DrawPixels(info) => Some(info.layer_id),
         }
     }
 }
