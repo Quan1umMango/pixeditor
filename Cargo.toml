@@ -1,6 +1,6 @@
 [package]
 name = "pixeditor"
-version = "0.2.1t"
+version = "0.2.1"
 edition = "2024"
 
 [dependencies]
