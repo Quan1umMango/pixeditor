@@ -1,4 +1,4 @@
-use crate::{Canvas, FillType, MoveCameraData, Tool, undo_redo::{ ActionsManager, Action }};
+use crate::{Canvas, ToolKind, FillType, MoveCameraData, Tool, undo_redo::{ ActionsManager, Action }};
 use crate::{
     SCROLL_BY, MAX_SCROLL, MAX_SCROLL_NEG, MOUSE_MOVE_BY, MOVE_CAMERA_KEY,
 };
@@ -128,41 +128,14 @@ impl Project {
             // Tools
             egui::Window::new("Tools").show(egui_ctx, |ui| {
                 use crate::icons::*;
-                let single_pixel_btn = egui::ImageButton::new(PAINT_BRUSH_ICON);
-                let eraser_btn = egui::ImageButton::new(ERASER_ICON);
-                let rect_border_btn = egui::ImageButton::new(RECT_BORDER_ICON);
-                let rect_filled_btn = egui::ImageButton::new(RECT_FILLED_ICON);
-                let fill_btn = egui::ImageButton::new(FILL_ICON);
-                let line_btn = egui::ImageButton::new(LINE_ICON);
-
-                let single_pixel_resp = ui.add_sized(ICON_SIZE, single_pixel_btn);
-
-                let eraser_resp = ui.add_sized(ICON_SIZE, eraser_btn);
-                let rect_border_resp = ui.add_sized(ICON_SIZE,rect_border_btn);
-                let rect_filled_resp = ui.add_sized(ICON_SIZE,rect_filled_btn);
-                let fill_resp = ui.add_sized(ICON_SIZE,fill_btn);
-                let line_resp = ui.add_sized(ICON_SIZE,line_btn);
-
-                if single_pixel_resp.clicked() {
-                    self.canvas.set_tool(Tool::pixel());
-                }
-                if eraser_resp.clicked() {
-                    self.canvas.set_tool(Tool::eraser());
-                }
-
-                if rect_border_resp.clicked() {
-                    self.canvas.set_tool(Tool::rect(FillType::NoFill));
-                }
-
-                if rect_filled_resp.clicked() {
-                    self.canvas.set_tool(Tool::rect(FillType::SolidFill));
-                }
-
-                if fill_resp.clicked() {
-                    self.canvas.set_tool(Tool::fill());
-                }
-                if line_resp.clicked() {
-                    self.canvas.set_tool(Tool::line());
+            
+                let cur_tool = self.canvas.tool().kind;
+                for (img_src,tk) in ICON_TOOL_MAPPINGS {
+                    let btn = egui::ImageButton::new(img_src).selected(tk == cur_tool);
+                    let resp = ui.add_sized(ICON_SIZE,btn);
+                    if resp.clicked() {
+                        self.canvas.set_tool(Tool::new(tk,crate::ToolInfo::default()));
+                    }
                 }
             });
 
@@ -303,3 +276,17 @@ impl SaveOptions {
     }
 
 }
+
+
+use crate::icons::*;
+
+    const ICON_TOOL_MAPPINGS:[(egui::widgets::ImageSource,ToolKind);6] = [ 
+(PAINT_BRUSH_ICON,ToolKind::Pixel),
+(ERASER_ICON,ToolKind::Eraser), 
+    (RECT_BORDER_ICON,ToolKind::Rect(FillType::NoFill)),
+    (RECT_FILLED_ICON,ToolKind::Rect(FillType::SolidFill)),
+    (FILL_ICON,ToolKind::Fill),
+    (LINE_ICON,ToolKind::Line)
+
+
+    ];

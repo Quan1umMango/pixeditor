@@ -160,7 +160,6 @@ impl Canvas {
         let kind = tool.kind;
         let info = &tool.info;
         let start_end_pos: Option<(Vec2, Vec2)> = self.get_pos_from_tool_info(camera, info);
-        //let pixels_to_draw_special:Option<Vec<usize>> = self.get_pixels_to_draw_special();
 
         for i in 0..(self.num_pixels * self.num_pixels) {
             let active_layer = self.active_layer().unwrap();
@@ -291,6 +290,11 @@ impl Canvas {
 
     pub fn set_tool(&mut self, new_tool: Tool) {
         self.tool = new_tool;
+    }
+    
+
+    pub fn tool(&self) -> &Tool {
+        &self.tool
     }
 
     pub fn get_pixel_index_at_mouse_position(&self, camera: &Camera2D) -> Option<usize> {
@@ -576,4 +580,5 @@ impl Canvas {
     pub fn delete_layer(&mut self, id:LayerId)  {
         self.layers.shift_remove(&id);
     }
+
 }

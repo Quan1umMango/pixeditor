@@ -158,6 +158,24 @@ pub enum ToolKind {
     Line,
 }
 
+impl PartialEq for ToolKind {
+    fn eq(&self, other:&Self) -> bool {
+        use ToolKind::*;
+
+        match (self,other) {
+            (Pixel,Pixel) => true,
+            (Eraser,Eraser) => true,
+            (Rect(FillType::SolidFill),Rect(FillType::SolidFill)) => true,
+            (Rect(FillType::NoFill),Rect(FillType::NoFill)) => true,
+            (Fill,Fill) => true,
+            (Line,Line) => true,
+            _ => false
+        }
+    }
+}
+
+impl Eq for ToolKind {}
+
 impl Tool {
     pub fn new(kind: ToolKind, info: ToolInfo) -> Tool {
         Tool { kind, info }
@@ -179,6 +197,7 @@ impl Tool {
         Tool::new(ToolKind::Line, ToolInfo::default())
     }
 }
+
 
 /*
 
