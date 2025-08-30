@@ -148,7 +148,7 @@ pub struct Tool {
     info: ToolInfo,
 }
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone,PartialEq,Eq)]
 pub enum ToolKind {
     #[default]
     Pixel,
@@ -157,24 +157,6 @@ pub enum ToolKind {
     Fill,
     Line,
 }
-
-impl PartialEq for ToolKind {
-    fn eq(&self, other:&Self) -> bool {
-        use ToolKind::*;
-
-        match (self,other) {
-            (Pixel,Pixel) => true,
-            (Eraser,Eraser) => true,
-            (Rect(FillType::SolidFill),Rect(FillType::SolidFill)) => true,
-            (Rect(FillType::NoFill),Rect(FillType::NoFill)) => true,
-            (Fill,Fill) => true,
-            (Line,Line) => true,
-            _ => false
-        }
-    }
-}
-
-impl Eq for ToolKind {}
 
 impl Tool {
     pub fn new(kind: ToolKind, info: ToolInfo) -> Tool {
@@ -198,42 +180,7 @@ impl Tool {
     }
 }
 
-
-/*
-
-impl DrawTool {
-    pub fn info(&self) -> Option<&ToolInfo> {
-        use DrawTool::*;
-        match self {
-            Rect(info,_) | Line(info) => Some(info),
-            _ => None
-        }
-    }
-
-    pub fn set_info(&mut self, tinfo:ToolInfo) {
-        use DrawTool::*;
-        match self {
-            Rect(info,_) | Line(info) => { *info = tinfo; },
-            _ => ()
-        }
-    }
-
-    /// Returns the previous value of tool info before being swapped (if any, else None)
-    pub fn replace_info(&mut self, new_info:ToolInfo) -> Option<ToolInfo> {
-        use DrawTool::*;
-        match self {
-            Rect(info,_) | Line(info) => {
-                let mut ni = new_info;
-                std::mem::swap(info, &mut ni);
-                return Some(ni);
-            },
-            _ => None
-        }
-    }
-}
-*/
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy,PartialEq,Eq)]
 pub enum FillType {
     NoFill,
     SolidFill,
